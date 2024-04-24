@@ -8,26 +8,34 @@ def read_config(filename='config.ini'):
     return config['database']
 
 def connect_odbc(config):
-    connection_str = f"DRIVER={config['driver']};SERVER={config['server']};DATABASE={config['database']};UID={config['username']};PWD={config['password']};TRUSTED_CONNECTION={config['trusted_connection']}"
-    connection = pyodbc.connect(connection_str)
-    cursor = connection.cursor()
-    return connection, cursor
+    connection_str = (
+        f"DRIVER={config['driver']};SERVER={config['server']};"
+        f"DATABASE={config['database']};UID={config['username']};"
+        f"PWD={config['password']};TRUSTED_CONNECTION={config['trusted_connection']}"
+    )
+    return pyodbc.connect(connection_str)
 
-def execute_query(query, data):
-    connection, cursor = connect_odbc(config)
+def insert_data(connection, data):
     try:
-        cursor.executemany(query, data)
+        cursor = connection.cursor()
+        cursor.executemany("INSERT INTO ESCRITORAS (NOME) VALUES (?)", data)
         connection.commit()
+        cursor.close()
     except pyodbc.DatabaseError as e:
         print(e)
         connection.rollback()
-    finally:
-        connection.close()
+    except Exception as e:
+        print(e)
 
 fake = Faker()
-insert_names = "INSERT INTO USUARIOS (NOME) VALUES (?)"
 fake_names = [(fake.name(),) for _ in range(100)]
 
 config = read_config()
-for name in fake_names:
-    execute_query(insert_names, name)
+try:
+    connection = connect_odbc(config)
+    insert_data(connection, fake_names)
+except pyodbc.Error as e:
+    print(e)
+finally:
+    if connection:
+        connection.close()
